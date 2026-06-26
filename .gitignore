@@ -1,0 +1,15 @@
+# Build output
+dist/
+*.zip
+
+# Secrets / local config (never commit OAuth client secrets or API keys)
+.env
+.env.*
+!.env.example
+*.local
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -1,0 +1,52 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/teams/vDevPreview/MicrosoftTeams.schema.json",
+  "manifestVersion": "devPreview",
+  "version": "1.0.0",
+  "id": "89b6ddb0-0c24-40fa-8a1e-f4593e367dd8",
+  "packageName": "com.williamvz.copilotcowork.notion",
+  "developer": {
+    "name": "Marketing Team",
+    "websiteUrl": "https://example.com/notion-cowork-connector",
+    "privacyUrl": "https://example.com/notion-cowork-connector/privacy",
+    "termsOfUseUrl": "https://example.com/notion-cowork-connector/terms"
+  },
+  "name": {
+    "short": "Notion Connector",
+    "full": "Notion Connector for Copilot Cowork"
+  },
+  "description": {
+    "short": "Talk to your Notion workspace from Copilot Cowork.",
+    "full": "Connects Microsoft 365 Copilot Cowork to your Notion workspace through Notion's official hosted MCP server. Once connected, Cowork can search, read, create, and update Notion pages, databases, and comments on your behalf, using your own Notion permissions. Built for marketing teams that plan everything in Notion: draft and update campaign briefs, triage the content calendar, and generate a weekly marketing digest, all without leaving Copilot."
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "accentColor": "#000000",
+  "agentConnectors": [
+    {
+      "id": "notion-mcp",
+      "displayName": "Notion",
+      "description": "Connects Copilot Cowork to your Notion workspace so it can search, read, create, and update pages, databases, and comments. The first time you use it you'll be prompted to sign in to Notion; Cowork then acts with your own Notion permissions.",
+      "toolSource": {
+        "remoteMcpServer": {
+          "mcpServerUrl": "https://mcp.notion.com/mcp"
+        }
+      }
+    }
+  ],
+  "agentSkills": [
+    {
+      "folder": "./skills/notion-connector-guide"
+    },
+    {
+      "folder": "./skills/marketing-campaign-brief"
+    },
+    {
+      "folder": "./skills/content-calendar-ops"
+    },
+    {
+      "folder": "./skills/weekly-marketing-digest"
+    }
+  ]
+}
