@@ -136,7 +136,10 @@ Option A or B to get the actual connector.
 
 ## Connect Notion (first run)
 
-The first time Copilot uses a Notion tool, Cowork starts the OAuth flow:
+> ⚠️ In current Cowork preview the DCR sign-in flow may not trigger — see
+> [Authentication options](#authentication-options) if you get **no prompt**.
+
+When it works, the first time Copilot uses a Notion tool Cowork starts the OAuth flow:
 
 1. You'll be prompted to **sign in to Notion** and **authorize** the connection.
 2. Notion lets you choose which workspace and which pages/databases to share.
@@ -163,20 +166,55 @@ Once connected, ask Cowork things like:
 
 ## Authentication options
 
-This plugin uses **DCR** (the simplest, recommended path for Notion). For
-reference, Cowork connectors support three modes via the connector's
+This plugin uses **explicit Dynamic Client Registration (DCR)**, because Notion's
+hosted MCP server **only supports DCR** — there is no static OAuth client to
+pre-register. Cowork connectors support these modes via
 `toolSource.remoteMcpServer.authorization`:
 
-| Mode | When to use | Config |
-|------|-------------|--------|
-| **Dynamic Client Registration (DCR)** ✅ *(used here)* | The MCP server supports DCR (Notion does). | **Omit** `authorization` entirely. Cowork auto-creates the OAuth client. |
-| **OAuthPluginVault** | You must use a pre-registered OAuth client. | `"authorization": { "type": "OAuthPluginVault", "referenceId": "<vault-ref>" }` |
-| **ApiKeyPluginVault** | The server authenticates with a static API key. | `"authorization": { "type": "ApiKeyPluginVault", "referenceId": "<vault-ref>" }` |
+| Mode | What it means | Works with hosted Notion MCP? |
+|------|---------------|-------------------------------|
+| *(omitted)* / `None` | No authentication. | ❌ No — Notion requires OAuth, so you get **no sign-in prompt at all**. *(This was the original bug in this repo.)* |
+| `DynamicClientRegistration` ✅ *(used here)* | Cowork registers itself as an OAuth client at runtime (RFC 7591). | ☑️ Correct config — but **currently flaky on the Cowork surface** (see warning). |
+| `OAuthPluginVault` | Pre-registered OAuth client (id/secret) stored in Developer Portal. | ❌ No — Notion's hosted MCP issues no static client to register. |
+| `ApiKeyPluginVault` | Static API key stored in Developer Portal. | ❌ Not against `mcp.notion.com`. ✅ Works if you **self-host** the Notion MCP server (see fallback). |
 
-For Notion, **DCR is the intended path** — leave `authorization` out, as this
-manifest does. Only switch to OAuthPluginVault if your tenant requires a
-pre-registered client (see Microsoft's "Configure authentication for MCP and API
-plugins" guidance), and never commit client secrets to this repo.
+> ⚠️ **Known Microsoft preview limitation.** DCR connectors on the Cowork surface
+> are reported to silently fail — Microsoft never calls Notion's
+> `/.well-known/oauth-protected-resource`, so **no sign-in prompt ever appears**.
+> If the steps below don't produce a prompt, that's the platform bug, not your
+> config. The dependable workaround is the [self-hosted fallback](#fallback-if-dcr-still-doesnt-prompt).
+
+### Register the DCR config in Developer Portal
+
+The `referenceId` (`notion-dcr` in the manifest) must resolve to a configuration
+in the [Teams Developer Portal](https://dev.teams.microsoft.com):
+
+1. Go to **dev.teams.microsoft.com → Tools**.
+2. Open the OAuth / client-registration area and create a new registration for a
+   **dynamic client registration / MCP** connector (this surface is new and the
+   exact label may change).
+3. Point it at Notion's MCP authorization metadata — Notion advertises everything
+   via discovery, so you mainly supply:
+   - **Resource / MCP server URL:** `https://mcp.notion.com/mcp`
+   - **Scopes:** leave default/empty (Notion authorizes at the workspace level).
+   - Allowed redirect (if asked): `https://teams.microsoft.com/api/platform/v1.0/oAuthRedirect`
+4. Save and copy the generated **registration ID**, then set it as `referenceId`
+   in `manifest.json` and re-run `./scripts/build.sh`.
+
+If the portal does **not** expose a DCR registration option yet, try uploading
+with the `referenceId` line removed (type only). Either way, if no prompt
+appears, it's the preview bug above — move to the fallback.
+
+### Fallback if DCR still doesn't prompt
+
+Because Notion's hosted MCP is DCR-only and Cowork's DCR is unreliable today, the
+reliable route is to **self-host the official Notion MCP server**
+(`@notionhq/notion-mcp-server`) configured with a **Notion internal integration
+token**, behind your own HTTPS endpoint, and register it in Cowork with
+`ApiKeyPluginVault` (or `None` on a private endpoint). This sidesteps DCR
+entirely. See [Why MCP instead of the Notion API](#why-mcp-instead-of-the-notion-api)
+— it's the same "wrap it in your own MCP server" shape. Never commit the
+integration token or API key to this repo.
 
 ---
 
@@ -188,11 +226,19 @@ plugins" guidance), and never commit client secrets to this repo.
 - **"Upload a custom app" is greyed out.** Your tenant blocks custom app upload.
   An admin must enable it (or use Option A to deploy centrally).
 - **Connector added but you never get a "Connect"/sign-in prompt, and Notion is
-  never contacted.** This has been reported with DCR connectors in current Cowork
-  preview builds. Things to try: remove and re-add the plugin; confirm the
-  manifest version is one your tenant accepts (see next item); as a fallback,
-  switch the endpoint to Notion's SSE URL `https://mcp.notion.com/sse`; or, if
-  your org mandates it, register a client and use `OAuthPluginVault`.
+  never contacted.** Two distinct causes:
+  1. **`authorization` omitted** → Cowork treats the server as **no-auth** and
+     never starts a sign-in. Fixed in this repo by declaring
+     `DynamicClientRegistration` explicitly (see [Authentication options](#authentication-options)).
+  2. **DCR not yet reliable on the Cowork surface** → even with the correct
+     config, Microsoft may not call Notion's `/.well-known/*`, so no prompt
+     appears. This is a [known preview limitation](https://learn.microsoft.com/en-au/answers/questions/5886163/).
+     Things to try: remove/re-add the plugin; register the `notion-dcr` config in
+     Developer Portal; try the `referenceId`-removed variant; try the `/sse`
+     endpoint. If none work, use the
+     [self-hosted fallback](#fallback-if-dcr-still-doesnt-prompt) —
+     `OAuthPluginVault` is **not** an option for Notion's hosted MCP (no static
+     client).
 - **Sign-in succeeds but tool calls fail in chat.** Also reported in preview.
   Re-authorize from scratch, and double-check the `mcpServerUrl` is exactly
   `https://mcp.notion.com/mcp`. If it persists, try the `/sse` endpoint.
