@@ -30,7 +30,11 @@
       "description": "Connects Copilot Cowork to your Notion workspace so it can search, read, create, and update pages, databases, and comments. The first time you use it you'll be prompted to sign in to Notion; Cowork then acts with your own Notion permissions.",
       "toolSource": {
         "remoteMcpServer": {
-          "mcpServerUrl": "https://mcp.notion.com/mcp"
+          "mcpServerUrl": "https://mcp.notion.com/mcp",
+          "authorization": {
+            "type": "DynamicClientRegistration",
+            "referenceId": "notion-dcr"
+          }
         }
       }
     }
